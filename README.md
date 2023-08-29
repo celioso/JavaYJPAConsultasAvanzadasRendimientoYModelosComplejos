@@ -230,4 +230,143 @@ En esta aula, aprendiste:
 
 [Descargue los archivos en Github](https://github.com/alura-cursos/JPA-con-hibernate-Alura-II/tree/stage_1 "Descargue los archivos en Github") o haga clic [aquí](https://github.com/alura-cursos/JPA-con-hibernate-Alura-II/archive/refs/heads/stage_1.zip "aquí") para descargarlos directamente.
 
-************
+### Haga lo que hicimos en aula: consultas avanzadas
+
+En esta aula vamos a realizar consultas utilizando recursos de JPA que nos permiten realizar consultas con funciones de agregación tipo `SUM()`, `AVG()`, `MIN()`,... antes de proceder debemos agregar unos últimos detalles en la clase pedido y ítem pedido que nos permiten obtener el valor total.
+
+- Primero vamos a asignar el nombre de la columna con la anotación @Column(name=”columna”).
+
+```java
+@Column(name="valor_total")
+private BigDecimal valorTotal=new BigDecimal(0);
+```
+
+- Vamos a agregar un nuevo método que nos permite relacionar itemPedido con Pedido, así como Pedido con ItemPedido. Además de las anotaciones tenemos que asignar el valor correcto en nuestro relacionamiento.
+
+```java
+public void agregarItems(ItemsPedido item) {
+    item.setPedido(this);
+    this.items.add(item);
+this.valorTotal= this.valorTotal.add(item.getValor());
+}
+```
+
+- En la clase itemPedido agregamos un método que nos permite calcular el valor total a partir del precio y de la cantidad.
+
+```java
+public BigDecimal getValor() {
+    return this.precioUnitario.multiply(new BigDecimal(this.cantidad));
+}
+```
+
+- Por último en el DAO vamos agregar nuestros métodos de consulta. Vamos a utilizar las funciones de agregación para consultar el valor total en la base de datos con la función SUM().
+```java
+public BigDecimal valorTotalVendido() {
+    String jpql= "SELECT SUM(p.valorTotal) FROM Pedido p";
+    return em.createQuery(jpql,BigDecimal.class).getSingleResult();
+}
+```
+
+- Otro tipo de consulta es cuando queremos obtener en nuestra consulta atributos de múltiples entidades en una única consulta e incluso funciones de agregación para eso tenemos dos(2) métodos un crearemos un método que retorna una lista de Objetos para formar el relatorio.
+
+```java
+public List<Object[]> relatorioDeVentas(){
+    String jpql="SELECT producto.nombre, "
+            + "SUM(item.cantidad), "
+            + "MAX(pedido.fecha) "
+            + "FROM Pedido pedido "
+            + "JOIN pedido.items item "
+            + "JOIN item.producto producto "
+            + "GROUP BY producto.nombre "
+            + "ORDER BY item.cantidad DESC";
+    return em.createQuery(jpql,Object[].class).getResultList();
+}
+```
+
+- Y la forma más recomendada es mediante la construcción de una clase VO (value object) es una clase que nos permite enviar información dentro de nuestra aplicación.
+```java
+public class RelatorioDeVenta {
+
+    private String nombreDelProducto;
+    private Long CantidadDeProducto;
+    private LocalDate FechaDeUltimaVenta;
+
+    public RelatorioDeVenta(String nombreDelProducto, Long cantidadDeProducto, LocalDate fechaDeUltimaVenta) {
+        this.nombreDelProducto = nombreDelProducto;
+        CantidadDeProducto = cantidadDeProducto;
+        FechaDeUltimaVenta = fechaDeUltimaVenta;
+    }
+
+    public String getNombreDelProducto() {
+        return nombreDelProducto;
+    }
+
+    public void setNombreDelProducto(String nombreDelProducto) {
+        this.nombreDelProducto = nombreDelProducto;
+    }
+
+…
+
+public List<RelatorioDeVenta> relatorioDeVentasVO(){
+    String jpql="SELECT new com.latam.alura.tienda.vo.RelatorioDeVenta(producto.nombre, "
+            + "SUM(item.cantidad), "
+            + "MAX(pedido.fecha)) "
+            + "FROM Pedido pedido "
+            + "JOIN pedido.items item "
+            + "JOIN item.producto producto "
+            + "GROUP BY producto.nombre "
+            + "ORDER BY item.cantidad DESC";
+    return em.createQuery(jpql,RelatorioDeVenta.class).getResultList();
+}
+```
+
+- En una clase de prueba vamos a conseguir visualizar el resultado de las consultas.
+**Método 1)**
+
+```java
+BigDecimal valorTotal=pedidoDao.valorTotalVendido();
+System.out.println("Valor Total: "+ valorTotal);
+
+List<Object[]> relatorio = pedidoDao.relatorioDeVentasVO();
+for(Object[] obj:relatorio){
+System.out.println(obj[0]);
+System.out.println(obj[1]);
+System.out.println(obj[2]);
+}
+```
+**Método 2)**
+
+```java
+List<RelatorioDeVenta> relatorio = pedidoDao.relatorioDeVentasVO();
+relatorio.forEach(System.out::println);
+```
+
+- Para organizar las consultas podemos utilizar un recurso de JPA @NamedQueries que nos permite colocar una determinada consulta dentro de la entidad para indicar que esa consulta tiene un uso particular.
+```java
+@Entity
+@Table(name="productos")
+@NamedQuery(name="Producto.consultarPrecioPorNombre", query="SELECT P.precio FROM Producto AS P WHERE P.nombre=:nombre")
+public class Producto{...
+```
+
+- Aun cuando se encuentra indicada en la entidad el método continúa en la clase DAO y la consulta se encuentra en la entidad.
+```java
+public BigDecimal consultarPrecioPorNombreDeProducto(String nombre) {
+    return em.createNamedQuery("Producto.consultarPrecioPorNombre",BigDecimal.class).setParameter("nombre", nombre).getSingleResult();
+}
+```
+
+### Lo que aprendimos
+
+En esta aula, aprendiste:
+
+- Realización de consultas utilizando funciones de agregación como min, max, avg y sum;
+- Cómo escribir consultas de informes usando JPQL;
+- Cómo usar el recurso seleccionado nuevo en consultas JPQL;
+- Realización de consultas mediante consultas con nombre.
+
+### Proyecto del aula anterior
+
+¿Comenzando en esta etapa? Aquí puedes descargar los archivos del proyecto que hemos avanzado hasta el aula anterior.
+
+[Descargue los archivos en Github](https://github.com/alura-cursos/JPA-con-hibernate-Alura-II/tree/stage_2 "Descargue los archivos en Github") o haga clic [aquí](https://github.com/alura-cursos/JPA-con-hibernate-Alura-II/archive/refs/heads/stage_2.zip "aquí") para descargarlos directamente.
