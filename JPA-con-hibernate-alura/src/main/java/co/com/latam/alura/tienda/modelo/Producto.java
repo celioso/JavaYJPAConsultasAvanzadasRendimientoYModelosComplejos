@@ -4,37 +4,38 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.ManyToOne;
+import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 
+import co.com.latam.alura.tienda.prueba.LoadRecords;
+
+@SuppressWarnings("all")
 @Entity
 @Table(name="productos")
-public class Producto {
-	
+@NamedQuery(name="Producto.consultarPrecioPorNombre", query="SELECT P.precio FROM Producto AS P WHERE P.nombre=:nombre")
+public class Producto{
+
 	@Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
 	private Long id;
+	
 	private String nombre;
 	private String descripcion;
 	private BigDecimal precio;
 	private LocalDate fechaDeRegistro= LocalDate.now();
-
+	
 	@ManyToOne
-	private Categoria categoria;
-	
-	
-	
+	private LoadRecords categoria;
+
 	
 	public Producto() {
-	
+		
 	}
-	public Producto(String nombre, String descripcion, BigDecimal precio, Categoria categoria) {
-		super();
+	public Producto(String nombre, String descripcion, BigDecimal precio, LoadRecords categoria) {
 		this.nombre = nombre;
 		this.descripcion = descripcion;
 		this.precio = precio;
@@ -43,9 +44,7 @@ public class Producto {
 	public Long getId() {
 		return id;
 	}
-	public void setId(Long id) {
-		this.id = id;
-	}
+
 	public String getNombre() {
 		return nombre;
 	}
@@ -64,6 +63,4 @@ public class Producto {
 	public void setPrecio(BigDecimal precio) {
 		this.precio = precio;
 	}
-	
-	
 }
