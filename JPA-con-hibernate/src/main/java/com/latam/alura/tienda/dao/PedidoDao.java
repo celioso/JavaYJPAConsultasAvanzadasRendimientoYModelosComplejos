@@ -74,5 +74,8 @@ public class PedidoDao {
 		return em.createQuery(jpql,RelatorioDeVenta.class).getResultList();
 	}
 	
-
+	public Pedido consultarPedidoConCliente(Long id) {
+		String jpql = "SELECT p FROM Pedido p JOIN FETCH p.cliente WHERE p.id=:id";
+		return em.createQuery(jpql, Pedido.class).setParameter("id", id).getSingleResult();
+	}
 }

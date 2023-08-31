@@ -370,3 +370,187 @@ En esta aula, aprendiste:
 ¿Comenzando en esta etapa? Aquí puedes descargar los archivos del proyecto que hemos avanzado hasta el aula anterior.
 
 [Descargue los archivos en Github](https://github.com/alura-cursos/JPA-con-hibernate-Alura-II/tree/stage_2 "Descargue los archivos en Github") o haga clic [aquí](https://github.com/alura-cursos/JPA-con-hibernate-Alura-II/archive/refs/heads/stage_2.zip "aquí") para descargarlos directamente.
+
+
+### PHaga lo que hicimos en aula: performance de consultas
+
+Al construir nuestra aplicación mediante el uso de recursos que realizan operaciones que no se encuentran explicitas debemos estudiar la documentación para entender cual es la ciencia detrás del framework o recurso.
+
+Cuando realizamos consultas con la anotación `@ManyToOne` o `@OneToOne` detrás de escena JPA aplica una estrategia de cargamento de información llamada Eager o Anticipada o Proactiva realizando JOINS entre tablas. Pero no acaba allí, ya que si esa entidad que tiene el JOIN, tiene otras entidades dentro de sus atributos marcados con la anotación finalizando ToOne, también serán cargadas dentro de la consulta. Esto puede saturar la memoria y afectar seriamente la velocidad de carga, ya para corregir debemos utilizar el parámetro de carga FerchType.LAZY en todas las anotaciones ToOne que le indica a JPA solo cargar la entidad si es solicitada.
+
+```java
+public class Producto{
+…    
+    @ManyToOne(fetch=FetchType.LAZY)
+    private Categoria categoria;
+```
+
+```java
+public class Pedido {
+    …
+    @ManyToOne(fetch=FetchType.LAZY)
+    private Cliente cliente;
+```
+
+```java
+public class ItemsPedido {
+    …
+    @ManyToOne(fetch=FetchType.LAZY)
+    private Producto producto;
+
+    @ManyToOne(fetch=FetchType.LAZY)
+    private Pedido pedido;
+```
+
+- Al realizar esta corrección se presenta un posible inconveniente donde nos encontremos con la necesidad de utilizar ese atributo de entidad. Pero para ese momento ya el EntityManager se puede encontrar cerrado, por lo que tenemos que planear nuestras consultas previniendo, el uso de esa entidad aún cuando se encuentre cerrado el EntityManager.
+
+```java
+public Pedido consultarPedidoConCliente(Long id) {
+    String jpql="SELECT p FROM Pedido p JOIN FETCH p.cliente WHERE p.id=:id";
+    return em.createQuery(jpql,Pedido.class).setParameter("id", id).getSingleResult();
+}
+
+public class PruebaDeDesempenho {
+    public static void main(String[] args) throws FileNotFoundException {
+//        LoadRecords.cargarRegistros();
+        EntityManager em = JPAUtils.getEntityManager();
+        PedidoDao pedidoDao = new PedidoDao(em);
+        Pedido pedidoConCliente = pedidoDao.consultarPedidoConCliente(2l);
+        em.close();
+
+//        System.out.println(pedido.getFecha());
+//        System.out.println(pedido.getItems().size());
+        System.out.println(pedidoConCliente.getCliente().getNombre());
+    }
+}
+```
+
+### Lo que aprendimos
+
+En esta aula, aprendiste:
+
+- Cómo funcionan las estrategias EAGER y LAZY, en consultas de entidades que tienen relaciones;
+- Por qué JPA podría lanzar LazyInitializationException en ciertas situaciones;
+- Buenas prácticas en la carga de entidades con relaciones;
+- Cómo realizar consultas programadas con la función de búsqueda de combinación.
+
+#### Proyecto del aula anterior
+
+¿Comenzando en esta etapa? Aquí puedes descargar los archivos del proyecto que hemos avanzado hasta el aula anterior.
+
+[Descargue los archivos en Github](https://github.com/alura-cursos/JPA-con-hibernate-Alura-II/tree/stage_3 "Descargue los archivos en Github") o haga clic [aquí](https://github.com/alura-cursos/JPA-con-hibernate-Alura-II/archive/refs/heads/stage_3.zip "aquí") para descargarlos directamente.
+
+### Haga lo que hicimos en aula: Criteria API
+
+Cuando queremos realizar consultas con múltiples parámetros nos encontramos con el problemas que todos ellos deben ser obligatorios, de lo contrario consultaria elementos nulos en tabla. Para evitar este error tenemos que usar parámetros dinámicos que nos permiten realizar consultas con múltiples parámetros y en caso de que alguno de estos sea nulo la consulta simplemente ignorará este parámetro y realizará la consulta con los parámetros existentes. Y en caso de no existir ningún parámetro, realizará la consulta de todos los elementos en la tabla.
+
+```java
+public List<Producto> consultarPorParametros(String nombre, BigDecimal precio,LocalDate fecha){
+    StringBuilder jpql=new StringBuilder("SELECT p FROM Producto p WHERE 1=1 ");
+
+    if(nombre!=null && !nombre.trim().isEmpty()) {
+        jpql.append("AND p.nombre=:nombre ");
+    }
+    if(precio!=null && !precio.equals(new BigDecimal(0))) {
+        jpql.append("AND p.precio=:precio ");
+    }
+    if(fecha!=null) {
+        jpql.append("AND p.fechaDeRegistro=:fecha");
+    }
+    TypedQuery<Producto> query = em.createQuery(jpql.toString(),Producto.class);
+    if(nombre!=null && !nombre.trim().isEmpty()) {
+        query.setParameter("nombre", nombre);
+    }
+    if(precio!=null && !precio.equals(new BigDecimal(0))) {
+        query.setParameter("precio", precio);
+    }
+    if(fecha!=null) {
+        query.setParameter("fechaDeRegistro", fecha);
+    }
+    return query.getResultList();        
+}
+```
+
+- Adicionalmente podemos realizar la misma consulta dinámica utilizando la API de Criteria que es un poco más compleja y recomendamos documentarse sobre ella pero simplifica la cantidad de condiciones en nuestra aplicación.
+
+```java
+public List<Producto> consultarPorParametrosConAPICriteria(String nombre, BigDecimal precio,LocalDate fecha){
+    CriteriaBuilder builder = em.getCriteriaBuilder();
+    CriteriaQuery<Producto> query = builder.createQuery(Producto.class);
+    Root<Producto> from = query.from(Producto.class);
+
+    Predicate filtro = builder.and();
+    if(nombre!=null && !nombre.trim().isEmpty()) {
+        filtro=builder.and(filtro,builder.equal(from.get("nombre"), nombre));
+    }
+    if(precio!=null && !precio.equals(new BigDecimal(0))) {
+        filtro=builder.and(filtro,builder.equal(from.get("precio"), precio));
+    }
+    if(fecha!=null) {
+        filtro=builder.and(filtro,builder.equal(from.get("fechaDeRegistro"), fecha));
+    }
+    query=query.where(filtro);
+    return em.createQuery(query).getResultList();
+}
+public class PruebaDeParametros {
+    public static void main(String[] args) {
+        cargarBancoDeDatos();
+
+        EntityManager em = JPAUtils.getEntityManager();
+        ProductoDao productoDao =new ProductoDao(em);
+
+        List<Producto> resultado = productoDao.consultarPorParametros("FIFA", new BigDecimal(10000), null);
+
+        System.out.println(resultado.get(0).getDescripcion());
+
+EntityManager em = JPAUtils.getEntityManager();
+        ProductoDao productoDao =new ProductoDao(em);
+
+        List<Producto> resultado = productoDao.consultarPorParametrosConAPICriteria("X", null, null);
+
+        System.out.println(resultado.get(0).getDescripcion());
+
+    }
+
+    private static void cargarBancoDeDatos() {
+        Categoria celulares = new Categoria("CELULARES");
+        Categoria videoJuegos = new Categoria("VIDEO_JUEGOS");
+        Categoria electronicos = new Categoria("ELECTRONICOS");
+
+        Producto celular = new Producto("X", "producto nuevo", new BigDecimal(10000), celulares);
+        Producto videoJuego = new Producto("FIFA", "2000", new BigDecimal(10000), videoJuegos);
+        Producto memoria = new Producto("memoria ram", "30 GB", new BigDecimal(10000), electronicos);
+
+        EntityManager em = JPAUtils.getEntityManager();
+        ProductoDao productoDao = new ProductoDao(em);
+        CategoriaDao categoriaDao = new CategoriaDao(em);
+
+        em.getTransaction().begin();
+
+        categoriaDao.guardar(celulares);
+        categoriaDao.guardar(videoJuegos);
+        categoriaDao.guardar(electronicos);
+
+        productoDao.guardar(celular);
+        productoDao.guardar(videoJuego);
+        productoDao.guardar(memoria);
+
+        em.getTransaction().commit();
+        em.close();
+    }
+}
+```
+
+### Lo que aprendimos
+
+En esta aula, aprendiste:
+
+- Cómo realizar consultas JPQL con parámetros opcionales;
+- Cómo funciona la API de criterios JPA;
+- Cómo realizar una consulta con parámetros opcionales a través de Criteria API.
+
+### Proyecto del aula anterior
+
+¿Comenzando en esta etapa? Aquí puedes descargar los archivos del proyecto que hemos avanzado hasta el aula anterior.
+
+[Descargue los archivos en Github](https://github.com/alura-cursos/JPA-con-hibernate-Alura-II/tree/stage_4 "Descargue los archivos en Github") o haga clic [aquí](https://github.com/alura-cursos/JPA-con-hibernate-Alura-II/archive/refs/heads/stage_4.zip "aquí") para descargarlos directamente.
